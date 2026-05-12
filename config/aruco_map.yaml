@@ -1,0 +1,15 @@
+# ArUco Marker Map
+# Known positions of ArUco markers in the world frame.
+# Each marker has an ID and a position [x, y, θ] in meters/radians.
+#
+# Measure these carefully — EKF correction quality depends on accurate positions.
+# Use a tape measure from the world origin to each marker center.
+
+markers:
+  - id: 0
+    position: [1.0, 0.0, 0.0]        # 1m ahead on x-axis, facing +x
+  - id: 1
+    position: [0.0, -1.0, 1.5708]    # 1m on -y axis, facing +y
+  # Add more markers as needed:
+  # - id: 2
+  #   position: [2.0, 1.0, 3.1416]
