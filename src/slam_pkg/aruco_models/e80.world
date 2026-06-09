@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="e80">
+
+    <!-- lighting -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- map -->
+    <include>
+      <uri>model://maps</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+    <!-- ── ArUco markers (DICT_4X4_50, 15 cm) ──────────────────── -->
+  <!-- ArUco ID  4 | map yaw=+0° -->
+  <include>
+    <uri>model://aruco_4</uri>
+    <name>aruco_4</name>
+    <pose>0.0030 1.0500 0.2000 0.000000 1.570796 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  0 | map yaw=+0° -->
+  <include>
+    <uri>model://aruco_0</uri>
+    <name>aruco_0</name>
+    <pose>0.0030 3.7860 0.2000 0.000000 1.570796 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  1 | map yaw=-90° -->
+  <include>
+    <uri>model://aruco_1</uri>
+    <name>aruco_1</name>
+    <pose>1.6100 4.8420 0.2000 1.570796 0.000000 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  2 | map yaw=+180° -->
+  <include>
+    <uri>model://aruco_2</uri>
+    <name>aruco_2</name>
+    <pose>3.7080 3.7570 0.2000 0.000000 -1.570796 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  3 | map yaw=+180° -->
+  <include>
+    <uri>model://aruco_3</uri>
+    <name>aruco_3</name>
+    <pose>3.7080 1.0900 0.2000 0.000000 -1.570796 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  6 | map yaw=-90° -->
+  <include>
+    <uri>model://aruco_6</uri>
+    <name>aruco_6</name>
+    <pose>1.2430 2.5270 0.2000 1.570796 0.000000 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  5 | map yaw=-90° -->
+  <include>
+    <uri>model://aruco_5</uri>
+    <name>aruco_5</name>
+    <pose>2.4430 2.5270 0.2000 1.570796 0.000000 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  7 | map yaw=+90° -->
+  <include>
+    <uri>model://aruco_7</uri>
+    <name>aruco_7</name>
+    <pose>1.2430 3.5930 0.2000 -1.570796 0.000000 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  8 | map yaw=+90° -->
+  <include>
+    <uri>model://aruco_8</uri>
+    <name>aruco_8</name>
+    <pose>2.4430 3.5930 0.2000 -1.570796 0.000000 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID  9 | map yaw=+180° -->
+  <include>
+    <uri>model://aruco_9</uri>
+    <name>aruco_9</name>
+    <pose>1.3620 1.5050 0.2000 0.000000 -1.570796 0.000000</pose>
+  </include>
+
+  <!-- ArUco ID 10 | map yaw=+0° -->
+  <include>
+    <uri>model://aruco_10</uri>
+    <name>aruco_10</name>
+    <pose>2.4280 1.5050 0.2000 0.000000 1.570796 0.000000</pose>
+  </include>
+
+  </world>
+</sdf>

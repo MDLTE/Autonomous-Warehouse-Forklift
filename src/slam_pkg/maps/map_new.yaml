@@ -1,0 +1,9 @@
+free_thresh: 0.196
+image: /home/patricio/ros2_ws/src/slam_pkg/maps/map_new.pgm
+negate: 0
+occupied_thresh: 0.65
+origin:
+- -0.14
+- -0.79
+- 0.0
+resolution: 0.01

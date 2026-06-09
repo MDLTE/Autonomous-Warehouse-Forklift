@@ -1,0 +1,12 @@
+{
+  "mission_1": [
+    {"index": 0, "x": 2.41, "y": 3.96, "theta": 0.0, "label": "FOURCONVEYORS"}
+  ],
+  "mission_2": [
+    {"index": 0, "x": 2.94, "y": 3.14, "theta": 0.0, "label": "CENTERRIGHTSHELF-RIGHTSIDE"},
+    {"index": 1, "x": 1.89, "y": 2.95, "theta": 0.0, "label": "CENTERSHELVES-CENTER"},
+    {"index": 2, "x": 0.56, "y": 2.90, "theta": 0.0, "label": "CENTERLEFTSHELF-LEFTSIDE"},
+    {"index": 3, "x": 1.78, "y": 1.89, "theta": 0.0, "label": "CENTERBOTTOMSHELF-TOPSIDE"},
+    {"index": 4, "x": 1.92, "y": 0.95, "theta": 0.0, "label": "CENTERBOTTOMSHELF-BOTTOMSIDE"}
+  ]
+}

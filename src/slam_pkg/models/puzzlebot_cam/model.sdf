@@ -1,0 +1,295 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="puzzlebot_cam">
+
+    <!-- ── Links ─────────────────────────────────────────────────── -->
+
+    <link name="base_footprint">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia><ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+    </link>
+
+    <!-- chassis — center at z=0.05 (wheel radius) -->
+    <link name="base_link">
+      <pose>0 0 0.05 0 0 0</pose>
+      <inertial>
+        <mass>0.8</mass>
+        <pose>-0.05 0 0 0 0 0</pose>
+        <inertia><ixx>0.07</ixx><iyy>0.08</iyy><izz>0.10</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://puzzlebot_cam/meshes/chassis1.dae</uri></mesh>
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <pose>-0.055 0 0 0 0 0</pose>
+        <geometry>
+          <box><size>0.20 0.16 0.046</size></box>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- left wheel — at (0, +0.095, 0.05) in model frame -->
+    <link name="wheel_left_link">
+      <pose>0 0.095 0.05 0 0 0</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.000051</ixx><iyy>0.000051</iyy><izz>0.000090</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://puzzlebot_cam/meshes/wheel.dae</uri></mesh>
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <pose>0 0 0 1.5708 0 0</pose>
+        <geometry>
+          <cylinder><radius>0.05</radius><length>0.005</length></cylinder>
+        </geometry>
+        <surface><friction><ode><mu>1.0</mu><mu2>0.2</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- right wheel — mirrored (z-rotation 180°) -->
+    <link name="wheel_right_link">
+      <pose>0 -0.095 0.05 0 0 3.14159</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia><ixx>0.000051</ixx><iyy>0.000051</iyy><izz>0.000090</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://puzzlebot_cam/meshes/wheel.dae</uri></mesh>
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <pose>0 0 0 1.5708 0 0</pose>
+        <geometry>
+          <cylinder><radius>0.05</radius><length>0.005</length></cylinder>
+        </geometry>
+        <surface><friction><ode><mu>1.0</mu><mu2>0.2</mu2></ode></friction></surface>
+      </collision>
+    </link>
+
+    <!-- caster ball -->
+    <link name="caster_back_link">
+      <pose>-0.145 0 0.006 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia><ixx>0.000051</ixx><iyy>0.000051</iyy><izz>0.000090</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><sphere><radius>0.006</radius></sphere></geometry>
+        <material>
+          <ambient>0.0 1 0.0 1</ambient>
+          <diffuse>0.0 1 0.0 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry><sphere><radius>0.006</radius></sphere></geometry>
+      </collision>
+    </link>
+
+    <!-- IMU (dummy — keeps TF tree intact with TurtleBot3 URDF) -->
+    <link name="imu_link">
+      <pose>0 0 0.068 0 0 0</pose>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia><ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+    </link>
+
+    <!-- LiDAR — 360°, 5 Hz, RPLidar A1 spec -->
+    <link name="base_scan">
+      <pose>0 0 0.11 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia><ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <sensor type="ray" name="base_scan_sensor">
+        <visualize>false</visualize>
+        <update_rate>5</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>360</samples>
+              <resolution>1</resolution>
+              <min_angle>-3.14159</min_angle>
+              <max_angle>3.14159</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.120</min>
+            <max>3.5</max>
+            <resolution>0.015</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </ray>
+        <plugin name="gazebo_ros_lidar" filename="libgazebo_ros_ray_sensor.so">
+          <ros>
+            <remapping>~/out:=scan</remapping>
+          </ros>
+          <output_type>sensor_msgs/LaserScan</output_type>
+          <frame_name>base_scan</frame_name>
+        </plugin>
+      </sensor>
+    </link>
+
+    <!-- camera — FOV 1.047 rad (60°), 320×240, 30 Hz -->
+    <link name="camera_link">
+      <pose>0.05 0 0.11 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia><ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+      <sensor type="camera" name="camera_sensor">
+        <camera name="head">
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>320</width>
+            <height>240</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip><near>0.02</near><far>300</far></clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+        <always_on>true</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <plugin name="camera_driver" filename="libgazebo_ros_camera.so">
+          <ros>
+            <remapping>image_raw:=image_raw</remapping>
+            <remapping>camera_info:=camera_info</remapping>
+          </ros>
+          <camera_name>camera</camera_name>
+          <frame_name>camera_rgb_optical_frame</frame_name>
+          <hack_baseline>0.07</hack_baseline>
+        </plugin>
+      </sensor>
+    </link>
+
+    <!-- camera optical frames (needed by aruco_detector) -->
+    <link name="camera_rgb_frame">
+      <pose>0.05 0 0.11 0 0 0</pose>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia><ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+    </link>
+
+    <link name="camera_rgb_optical_frame">
+      <pose>0.05 0 0.11 -1.5708 0 -1.5708</pose>
+      <inertial>
+        <mass>0.001</mass>
+        <inertia><ixx>0.001</ixx><iyy>0.001</iyy><izz>0.001</izz>
+                 <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia>
+      </inertial>
+    </link>
+
+    <!-- ── Joints ────────────────────────────────────────────────── -->
+
+    <joint name="base_joint" type="fixed">
+      <parent>base_footprint</parent>
+      <child>base_link</child>
+    </joint>
+
+    <joint name="wheel_left_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>wheel_left_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1.79769e+308</lower>
+          <upper>1.79769e+308</upper>
+          <effort>1</effort>
+        </limit>
+        <dynamics><friction>0.1</friction></dynamics>
+      </axis>
+    </joint>
+
+    <joint name="wheel_right_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>wheel_right_link</child>
+      <axis>
+        <xyz>0 -1 0</xyz>
+        <limit>
+          <lower>-1.79769e+308</lower>
+          <upper>1.79769e+308</upper>
+          <effort>1</effort>
+        </limit>
+        <dynamics><friction>0.1</friction></dynamics>
+      </axis>
+    </joint>
+
+    <joint name="caster_back_joint" type="ball">
+      <parent>base_link</parent>
+      <child>caster_back_link</child>
+    </joint>
+
+    <joint name="imu_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>imu_link</child>
+    </joint>
+
+    <joint name="scan_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>base_scan</child>
+    </joint>
+
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+
+    <joint name="camera_rgb_joint" type="fixed">
+      <parent>camera_link</parent>
+      <child>camera_rgb_frame</child>
+    </joint>
+
+    <joint name="camera_rgb_optical_joint" type="fixed">
+      <parent>camera_rgb_frame</parent>
+      <child>camera_rgb_optical_frame</child>
+    </joint>
+
+    <!-- ── Plugins ───────────────────────────────────────────────── -->
+
+    <!-- differential drive — wheel_separation 0.180, wheel_diameter 0.100 -->
+    <plugin name="puzzlebot_diff_drive" filename="libgazebo_ros_diff_drive.so">
+      <left_joint>wheel_left_joint</left_joint>
+      <right_joint>wheel_right_joint</right_joint>
+      <wheel_separation>0.180</wheel_separation>
+      <wheel_diameter>0.100</wheel_diameter>
+      <max_wheel_torque>20</max_wheel_torque>
+      <max_wheel_acceleration>1.0</max_wheel_acceleration>
+      <command_topic>cmd_vel</command_topic>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_wheel_tf>false</publish_wheel_tf>
+    </plugin>
+
+  </model>
+</sdf>

@@ -1,0 +1,1213 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f11">
+<title>BOTONI · Landscape</title>
+<script src="roslib.min.js"></script>
+<style>
+  :root{
+    --bg:#0e0f11; --panel:#16181c; --panel2:#1d2024; --line:#2a2e34;
+    --ink:#ecebe6; --muted:#868d97;
+    --hazard:#f5c518; --hazard-dim:#8a7212;
+    --live:#39d98a; --cyan:#37c3ff; --danger:#ff4d4d;
+    --mono: ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    /* FSM colors */
+    --fsm-stall:#6366f1; --fsm-nav:#f59e0b; --fsm-align:#10b981; --fsm-done:#8b5cf6;
+    --fsm-paused:#ef4444;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  html,body{height:100%;width:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden;user-select:none;-webkit-user-select:none;}
+  button{font:inherit;cursor:pointer}
+
+  #grid{
+    display:grid;
+    grid-template-columns:2fr 3fr;
+    grid-template-rows:1fr 1fr;
+    width:100vw;height:100vh;
+    gap:1px;background:var(--line);
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .quad{background:var(--bg);overflow:hidden;display:flex;flex-direction:column;}
+  .quad-header{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;}
+  .quad-title{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:6px;}
+  .quad-title::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--hazard-dim);}
+  .qgrow{flex:1}
+  .pill{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);display:flex;align-items:center;gap:5px;background:var(--panel2);white-space:nowrap;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--danger);box-shadow:0 0 6px var(--danger)}
+  .pill.ok .dot{background:var(--live);box-shadow:0 0 6px var(--live)}
+  .pill.ok{color:var(--live)}
+  .toggle{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;font-family:var(--mono);font-size:11px;}
+  .toggle button{background:var(--panel2);color:var(--muted);border:0;padding:5px 10px;font-weight:700;}
+  .toggle button.on{background:var(--hazard);color:#111}
+  .toggle button.on.flow{background:var(--cyan);color:#111}
+
+  /* ── Q1 CÁMARA ── */
+  #q-cam{grid-column:1;grid-row:1}
+  .cam-stage{position:relative;background:#000;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .cam-stage img{max-width:100%;max-height:100%;display:block}
+  .cam-ph{color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:14px}
+  .cam-ovl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+  .cam-rate{position:absolute;top:7px;right:7px;font-family:var(--mono);font-size:10px;background:rgba(8,9,10,.72);border:1px solid var(--line);border-radius:6px;padding:3px 7px;backdrop-filter:blur(3px);color:var(--cyan);}
+  .cam-cab-btn{position:absolute;bottom:7px;right:7px;border:1px solid var(--hazard);color:var(--hazard);background:rgba(8,9,10,.7);border-radius:8px;padding:6px 10px;font-family:var(--mono);font-size:11px;font-weight:700;}
+
+  /* ── Q2 FSM ── */
+  #q-fsm{grid-column:2;grid-row:1}
+
+  /* FSM canvas — white background */
+  .fsm-canvas{
+    flex:1;position:relative;background:#fff;overflow:hidden;
+  }
+  .fsm-canvas svg.fsm-arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;}
+
+  /* Bubbles — flex row, bubbles expand in place */
+  .fsm-row{
+    position:absolute;inset:0;
+    display:flex;flex-direction:row;align-items:center;
+    padding:0 16px;gap:0;
+    pointer-events:none;
+  }
+  .fb-wrap{
+    display:flex;flex-direction:column;align-items:center;
+    transition:flex .28s cubic-bezier(.34,1.56,.64,1);
+    pointer-events:auto;
+    flex:1;
+  }
+  .fb{
+    border-radius:50%;
+    border:2.5px solid #222;background:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:width .28s cubic-bezier(.34,1.56,.64,1),
+               height .28s cubic-bezier(.34,1.56,.64,1),
+               box-shadow .18s,border-color .18s;
+    width:52px;height:52px;
+  }
+  .fb:hover{box-shadow:0 0 0 3px rgba(0,0,0,.12);}
+  .fb .bn{font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.3px;color:#111;line-height:1.1;text-align:center;}
+  .fb .bs{font-family:var(--mono);font-size:7px;color:#555;line-height:1.1;text-align:center;margin-top:1px;}
+  .fb.active{box-shadow:0 0 0 5px #f5c518,0 0 18px rgba(245,197,24,.45);border-color:#111;}
+  .fb.done{border-color:#bbb;background:#f5f5f5;}
+  .fb.done .bn{color:#aaa;}
+  .fb.done .bs{color:#bbb;}
+  /* expanded selected node */
+  .fb.sel-node{width:86px;height:86px;border-color:#111;box-shadow:0 0 0 3px #111,0 4px 16px rgba(0,0,0,.15);}
+  .fb.sel-node .bn{font-size:10px;}
+  .fb.sel-node .bs{font-size:8px;}
+  .fb.paused-node{box-shadow:0 0 0 5px #f5c518,0 0 18px rgba(245,197,24,.45);border-color:#f5c518;}
+  .fb.paused-node .bn{color:#92400e;}
+  /* arrow labels between nodes */
+  .fb-arrow{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    flex:0 0 auto;width:28px;position:relative;
+    pointer-events:none;
+  }
+  .fb-arrow svg{width:28px;height:20px;}
+  .arrow-labels{
+    display:none;position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    background:#fff;border:1px solid #ddd;border-radius:4px;
+    padding:3px 5px;white-space:nowrap;z-index:20;
+    font-family:var(--mono);font-size:7px;color:#444;
+    flex-direction:column;gap:1px;text-align:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+  }
+  .fb-wrap.sel-wrap + .fb-arrow .arrow-labels,
+  .fb-arrow:has(+ .fb-wrap.sel-wrap) .arrow-labels{
+    display:flex;
+  }
+  /* monochrome bubbles */
+  .fb.active{box-shadow:0 0 0 5px #f5c518,0 0 18px rgba(245,197,24,.45);border-color:#111;}
+  .fb.paused-node{box-shadow:0 0 0 5px #f5c518,0 0 18px rgba(245,197,24,.45);border-color:#f5c518;}
+  .fb.paused-node .bn{color:#92400e;}
+
+  /* vars panel — bottom strip */
+  .fsm-vars-strip{
+    flex-shrink:0;background:#f8f8f6;border-top:1px solid #ddd;
+    padding:6px 10px;min-height:64px;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .fsm-vars-title{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:#888;text-transform:uppercase;}
+  .fsm-vars-row{display:flex;gap:4px;flex-wrap:wrap;}
+  .fsm-chip{
+    font-family:var(--mono);font-size:9px;font-weight:700;
+    padding:2px 7px;border-radius:4px;
+    border:1px solid #ddd;background:#fff;color:#555;
+    white-space:nowrap;
+  }
+  .fsm-chip.set{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8;}
+  .fsm-chip.live{background:#dcfce7;border-color:#86efac;color:#15803d;}
+  .fsm-chip.warn{background:#fef3c7;border-color:#fcd34d;color:#92400e;}
+  .fsm-chip.danger{background:#fee2e2;border-color:#fca5a5;color:#991b1b;}
+
+  /* ── Q3 MAPA ── */
+  #q-map{grid-column:1;grid-row:2}
+  .map-stage{flex:1;background:#111;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+  .map-img{display:block;filter:brightness(.9) contrast(1.05);transform:rotate(90deg);cursor:crosshair;width:60vh;height:60vw;max-width:100vh;max-height:100vw;object-fit:contain;}
+  .map-ph{color:var(--muted);font-family:var(--mono);font-size:11px;text-align:center;padding:12px;line-height:1.6;}
+  #map-goal-badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9px;color:var(--hazard);background:rgba(8,9,10,.7);border:1px solid var(--hazard-dim);border-radius:6px;padding:3px 8px;pointer-events:none;display:none;white-space:nowrap;}
+  #map-calibration{position:absolute;border:2px solid #37c3ff;background:rgba(55,195,255,0.08);pointer-events:none;z-index:10;left:80px;top:15px;width:380px;height:300px;}
+
+  /* ── Q4 CONTROLES ── */
+  #q-ctrl{grid-column:2;grid-row:2}
+  .ctrl-body{flex:1;display:flex;gap:1px;overflow:hidden;background:var(--line);}
+  .ctrl-third{flex:1;background:var(--bg);display:flex;flex-direction:column;gap:6px;padding:8px;overflow:hidden;}
+
+  .sel-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:5px;flex:1;position:relative;}
+  .sel-grid::before{content:"";position:absolute;left:calc(50% - 0.5px);top:0;bottom:0;width:1px;background:#2563eb;pointer-events:none;z-index:2;}
+  .sel-grid::after{content:"";position:absolute;left:50%;right:0;top:calc(200% / 3);height:1px;background:#2563eb;pointer-events:none;z-index:2;}
+
+  .btn-empresa{background:var(--panel2);border:1.5px solid var(--line);color:var(--ink);border-radius:9px;font-family:var(--mono);font-size:11px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:opacity .2s,border-color .2s,background .15s;overflow:hidden;padding:4px;}
+  .btn-empresa .emp-logo-ph{font-size:13px;font-weight:900;letter-spacing:.5px;color:var(--ink);}
+  .btn-empresa .emp-sub{font-size:8px;color:var(--muted);letter-spacing:.5px;}
+  .btn-empresa.sel{background:var(--panel);border-color:var(--hazard);box-shadow:0 0 0 2px rgba(245,197,24,.35);}
+  .btn-empresa.greyed{opacity:.3}
+
+  .btn-tipo{background:var(--panel2);border:1.5px solid var(--line);color:var(--ink);border-radius:9px;font-family:var(--mono);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;transition:opacity .2s,border-color .2s,background .15s;}
+  .btn-tipo.sel{background:var(--panel);border-color:var(--cyan);box-shadow:0 0 0 2px rgba(55,195,255,.3);color:var(--cyan);}
+  .btn-tipo.greyed{opacity:.3}
+  .btn-tipo.pallet-btn{color:var(--muted);flex-direction:column;line-height:1.3}
+  .btn-tipo.pallet-btn.mounted{background:var(--panel);border-color:var(--live);color:var(--live);box-shadow:0 0 0 2px rgba(57,217,138,.3);opacity:1!important;}
+
+  /* Mission buttons — stretch to fill */
+  .mid-btns{display:flex;flex-direction:column;gap:6px;flex:1;}
+  .btn-mid{width:100%;flex:1;background:var(--panel2);border:1.5px solid var(--line);color:var(--ink);border-radius:9px;font-family:var(--mono);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .btn-mid-start{background:#16a34a;color:#fff;border-color:#16a34a;box-shadow:0 3px 0 #0f5c29;}
+  .btn-mid-start:active{transform:translateY(2px);box-shadow:0 1px 0 #0f5c29}
+  .btn-mid-start.pause{background:#d97706;border-color:#d97706;box-shadow:0 3px 0 #92400e}
+  .btn-mid-start.pause:active{box-shadow:0 1px 0 #92400e}
+  .btn-mid-stop{background:var(--danger);color:#fff;border-color:var(--danger);box-shadow:0 3px 0 #7a1414;}
+  .btn-mid-stop:active{transform:translateY(2px);box-shadow:0 1px 0 #7a1414}
+
+  /* Karen — compact, bottom, no stretch */
+  .karen-row{
+    flex-shrink:0;display:flex;align-items:center;gap:8px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;cursor:pointer;
+  }
+  .karen-row.mic-on{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(55,195,255,.3);}
+  .karen-wave{display:flex;align-items:center;gap:1.5px;height:18px;}
+  .karen-wave .bar{width:3px;border-radius:2px;background:var(--cyan);animation:karen-idle 1.4s ease-in-out infinite;}
+  .karen-wave .bar:nth-child(odd){height:4px;}
+  .karen-wave .bar:nth-child(even){height:7px;animation-delay:.2s;}
+  .karen-wave.active .bar{animation:karen-speak .5s ease-in-out infinite alternate;}
+  .karen-wave.active .bar:nth-child(1){height:6px}
+  .karen-wave.active .bar:nth-child(2){height:14px;animation-delay:.05s}
+  .karen-wave.active .bar:nth-child(3){height:9px;animation-delay:.1s}
+  .karen-wave.active .bar:nth-child(4){height:16px;animation-delay:.15s}
+  .karen-wave.active .bar:nth-child(5){height:11px;animation-delay:.2s}
+  .karen-wave.active .bar:nth-child(6){height:14px;animation-delay:.25s}
+  @keyframes karen-idle{0%,100%{opacity:.4}50%{opacity:.8}}
+  @keyframes karen-speak{0%{transform:scaleY(.4)}100%{transform:scaleY(1)}}
+  .karen-label{font-family:var(--mono);font-size:9px;color:var(--muted);flex:1;transition:color .3s;}
+
+  /* Fork height */
+  .ht-body{flex:1;display:flex;gap:7px;align-items:stretch;overflow:hidden;}
+  .ht-slider{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0}
+  input[type=range].vert{writing-mode:vertical-lr;direction:rtl;width:28px;flex:1;accent-color:var(--hazard);background:transparent;}
+  .htval{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--hazard);text-align:center}
+  .htval small{display:block;font-size:8px;color:var(--muted);font-weight:600}
+  .ht-presets{flex:1;display:flex;flex-direction:column;gap:3px;overflow-y:auto;min-width:0}
+  .preset{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 6px;font-family:var(--mono);font-size:9px;text-align:left;line-height:1.2;white-space:nowrap;overflow:hidden;}
+  .preset b{color:var(--hazard);font-size:10px}
+  .preset.sel{outline:2px solid var(--hazard)}
+  .ht-cmd{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+  .goht{display:flex;align-items:center;gap:5px}
+  .goht input{width:72px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 6px;font-family:var(--mono);font-size:15px;font-weight:700;text-align:right;}
+  .goht .unit{font-family:var(--mono);color:var(--muted);font-size:11px}
+  .goht button{background:var(--hazard);color:#111;border:0;border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:12px;font-weight:800;}
+  .htstatus{font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .htstatus::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .htstatus.move{color:var(--hazard)}
+  .htstatus.move::before{background:var(--hazard);animation:pulse 1s infinite}
+  .htstatus.ok{color:var(--live)}
+  .htstatus.ok::before{background:var(--live);box-shadow:0 0 6px var(--live)}
+  @keyframes pulse{50%{opacity:.3}}
+
+  /* Cabina */
+  #cabina{position:fixed;inset:0;z-index:1000;background:#000;display:none}
+  #cabina.show{display:block}
+  #cabina img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .cab-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;padding:10px 12px;z-index:5;pointer-events:none;}
+  .cab-top>*{pointer-events:auto}
+  .cab-exit{width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(8,9,10,.55);color:#fff;font-size:20px;backdrop-filter:blur(4px);}
+  .cab-joy{position:absolute;right:26px;bottom:26px;width:42vh;max-width:230px;aspect-ratio:1/1;border-radius:50%;background:rgba(20,22,26,.32);border:2px solid rgba(255,255,255,.22);backdrop-filter:blur(2px);touch-action:none;z-index:5;}
+  .cab-joy .cross{background:rgba(255,255,255,.15);position:absolute}
+  .cab-joy .cross.h{left:12px;right:12px;top:50%;height:1px}
+  .cab-joy .cross.v{top:12px;bottom:12px;left:50%;width:1px}
+  .cab-joy .nub{position:absolute;width:34%;height:34%;left:33%;top:33%;border-radius:50%;transition:transform .04s linear;background:radial-gradient(circle at 40% 35%,rgba(255,224,102,.95),rgba(245,197,24,.85) 55%,rgba(184,148,15,.85));border:2px solid rgba(0,0,0,.5);}
+  .cab-stop{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(255,77,77,.9);color:#fff;border:2px solid #fff;border-radius:50%;width:74px;height:74px;font-family:var(--mono);font-weight:800;font-size:14px;}
+  .cab-preset{background:rgba(8,9,10,.65);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:7px;padding:6px 10px;font-family:var(--mono);font-size:10px;font-weight:700;text-align:left;white-space:nowrap;backdrop-filter:blur(4px);cursor:pointer;transition:background .15s;}
+  .cab-preset:active{background:rgba(245,197,24,.25);}
+  .cab-preset.sel{border-color:var(--hazard);color:var(--hazard);}
+</style>
+</head>
+<body>
+<div id="grid">
+
+<!-- Q1 CÁMARA -->
+<div class="quad" id="q-cam">
+  <div class="quad-header">
+    <div class="quad-title">Cámara</div>
+    <div class="qgrow"></div>
+    <div class="pill" id="conn"><span class="dot"></span><span id="connTxt">…</span></div>
+  </div>
+  <div class="cam-stage">
+    <img id="cam" alt="">
+    <svg id="ovl" class="cam-ovl" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="cam-ph" id="camPh">conectando cámara…</div>
+    <div class="cam-rate" id="rate">—</div>
+    <button class="cam-cab-btn" id="expand">⛶ Cabina</button>
+  </div>
+</div>
+
+<!-- Q2 FSM -->
+<div class="quad" id="q-fsm">
+  <div class="quad-header">
+    <div class="quad-title">Máquina de estados</div>
+    <span id="task-status-badge" style="font-family:var(--mono);font-size:9px;color:var(--cyan);background:rgba(55,195,255,.08);border:1px solid rgba(55,195,255,.25);border-radius:4px;padding:2px 6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+    <span id="fsm-log" style="font-family:var(--mono);font-size:9px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+    <div class="qgrow"></div>
+    <button onclick="fsmNav(-1)" style="background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:13px;font-weight:700;">◀</button>
+    <button onclick="fsmNav(1)"  style="background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:13px;font-weight:700;">▶</button>
+    <div class="toggle" id="modeToggle">
+      <button id="mManual" class="on">MANUAL</button>
+      <button id="mFlow" class="flow">FLOW</button>
+    </div>
+  </div>
+
+  <!-- canvas blanco — flex row de nodos -->
+  <div class="fsm-canvas" id="fsmCanvas">
+    <div class="fsm-row" id="fsm-row">
+
+      <!-- STALL -->
+      <div class="fb-wrap" id="wrap-STALL">
+        <div class="fb" id="fb-STALL" onclick="fsmSelectNode('STALL')">
+          <span class="bn">STALL</span><span class="bs">inicio</span>
+        </div>
+      </div>
+
+      <!-- arrow STALL→NAV_GET -->
+      <div class="fb-arrow" id="arr-0">
+        <svg viewBox="0 0 28 20"><line x1="2" y1="10" x2="22" y2="10" stroke="#222" stroke-width="2"/><polygon points="22,6 28,10 22,14" fill="#222"/></svg>
+        <div class="arrow-labels" id="albl-0">
+          <span style="color:#888">T1 / T2</span>
+          <span style="color:#10b981">NAV:QR_FOUND</span>
+        </div>
+      </div>
+
+      <!-- NAV_GET -->
+      <div class="fb-wrap" id="wrap-NAV_GET">
+        <div class="fb" id="fb-NAV_GET" onclick="fsmSelectNode('NAV_GET')">
+          <span class="bn">NAV</span><span class="bs" id="sub-NAV_GET">GET</span>
+        </div>
+      </div>
+
+      <!-- arrow NAV_GET→ALIGN_GET -->
+      <div class="fb-arrow" id="arr-1">
+        <svg viewBox="0 0 28 20"><line x1="2" y1="10" x2="22" y2="10" stroke="#222" stroke-width="2"/><polygon points="22,6 28,10 22,14" fill="#222"/></svg>
+        <div class="arrow-labels" id="albl-1">
+          <span style="color:#888">T3</span>
+          <span style="color:#10b981">QR:DONE</span>
+        </div>
+      </div>
+
+      <!-- ALIGN_GET -->
+      <div class="fb-wrap" id="wrap-ALIGN_GET">
+        <div class="fb" id="fb-ALIGN_GET" onclick="fsmSelectNode('ALIGN_GET')">
+          <span class="bn">ALIGN</span><span class="bs" id="sub-ALIGN_GET">QR</span>
+        </div>
+      </div>
+
+      <!-- arrow ALIGN_GET→NAV_LOGO -->
+      <div class="fb-arrow" id="arr-2">
+        <svg viewBox="0 0 28 20"><line x1="2" y1="10" x2="22" y2="10" stroke="#222" stroke-width="2"/><polygon points="22,6 28,10 22,14" fill="#222"/></svg>
+        <div class="arrow-labels" id="albl-2">
+          <span style="color:#888">T6:emp</span>
+          <span style="color:#10b981">NAV:LOGO_REACHED</span>
+        </div>
+      </div>
+
+      <!-- NAV_LOGO -->
+      <div class="fb-wrap" id="wrap-NAV_LOGO">
+        <div class="fb" id="fb-NAV_LOGO" onclick="fsmSelectNode('NAV_LOGO')">
+          <span class="bn">NAV</span><span class="bs" id="sub-NAV_LOGO">LOGO</span>
+        </div>
+      </div>
+
+      <!-- arrow NAV_LOGO→ALIGN_LOGO -->
+      <div class="fb-arrow" id="arr-3">
+        <svg viewBox="0 0 28 20"><line x1="2" y1="10" x2="22" y2="10" stroke="#222" stroke-width="2"/><polygon points="22,6 28,10 22,14" fill="#222"/></svg>
+        <div class="arrow-labels" id="albl-3">
+          <span style="color:#888">T7:emp</span>
+          <span style="color:#10b981">ALIGN:DONE</span>
+        </div>
+      </div>
+
+      <!-- ALIGN_LOGO -->
+      <div class="fb-wrap" id="wrap-ALIGN_LOGO">
+        <div class="fb" id="fb-ALIGN_LOGO" onclick="fsmSelectNode('ALIGN_LOGO')">
+          <span class="bn">ALIGN</span><span class="bs" id="sub-ALIGN_LOGO">LOGO</span>
+        </div>
+      </div>
+
+      <!-- arrow ALIGN_LOGO→DONE -->
+      <div class="fb-arrow" id="arr-4">
+        <svg viewBox="0 0 28 20"><line x1="2" y1="10" x2="22" y2="10" stroke="#222" stroke-width="2"/><polygon points="22,6 28,10 22,14" fill="#222"/></svg>
+        <div class="arrow-labels" id="albl-4">
+          <span style="color:#10b981">DONE</span>
+        </div>
+      </div>
+
+      <!-- MISSION_DONE -->
+      <div class="fb-wrap" id="wrap-MISSION_DONE">
+        <div class="fb" id="fb-MISSION_DONE" onclick="fsmSelectNode('MISSION_DONE')">
+          <span class="bn">DONE</span><span class="bs">✓</span>
+        </div>
+      </div>
+
+    </div><!-- /fsm-row -->
+
+    <!-- PAUSED overlay -->
+    <div id="paused-badge" style="display:none;position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+      background:#fffbeb;border:2px solid #f5c518;border-radius:6px;padding:4px 12px;
+      font-family:var(--mono);font-size:10px;font-weight:800;color:#92400e;z-index:20;">
+      ⏸ PAUSED — <span id="paused-at">—</span>
+    </div>
+  </div>
+
+  <!-- vars strip -->
+  <div class="fsm-vars-strip" id="fsm-vars-strip">
+    <div class="fsm-vars-title" id="fsm-vars-title">selecciona un estado ↑</div>
+    <div class="fsm-vars-row" id="fsm-vars-row"></div>
+  </div>
+</div>
+
+<!-- Q3 MAPA -->
+<div class="quad" id="q-map">
+  <div class="quad-header">
+    <div class="quad-title">Mapa</div>
+    <div class="qgrow"></div>
+    <span id="nav-status-badge" style="font-family:var(--mono);font-size:9px;color:var(--muted)">—</span>
+    <div class="toggle" id="mapModeToggle">
+      <button id="mMapLive" class="on">LIVE</button>
+      <button id="mMapStatic">STATIC</button>
+    </div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;">
+      <button id="tabPath" onclick="setMapTab('path')" style="flex:1;background:var(--hazard);color:#111;border:0;padding:6px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;">PATH</button>
+      <button id="tabKalman" onclick="setMapTab('kalman')" style="flex:1;background:var(--panel2);color:var(--muted);border:0;padding:6px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;">KALMAN</button>
+    </div>
+    <div class="map-stage" id="mapStage" style="flex:1;">
+      <div id="map-calibration"></div>
+      <img class="map-img" id="mapImg" src="map.png" alt="" style="cursor:crosshair"
+           onerror="this.style.display='none';document.getElementById('mapPh').style.display='flex'">
+      <div class="map-ph" id="mapPh" style="display:none">📡 Esperando mapa…</div>
+      <div id="map-goal-badge">📍 meta enviada</div>
+    </div>
+    <div id="mapKalman" style="flex:1;display:none;background:#000;align-items:center;justify-content:center;overflow:hidden;">
+      <img id="kalmanImg" alt="" style="max-width:100%;max-height:100%;display:block;object-fit:contain;transform:rotate(90deg);">
+    </div>
+  </div>
+</div>
+
+<!-- Q4 CONTROLES -->
+<div class="quad" id="q-ctrl">
+  <div class="quad-header">
+    <div class="quad-title">Control de misión</div>
+    <div class="qgrow"></div>
+    <span style="font-family:var(--mono);font-size:9px;color:var(--muted)" id="ttarget">target —</span>
+  </div>
+  <div class="ctrl-body">
+    <!-- col 1: empresa + tipo -->
+    <div class="ctrl-third">
+      <div class="sel-grid" id="selGrid">
+        <button class="btn-empresa" id="btn-emezon" data-emp="Emezon">
+          <span class="emp-logo-ph">EMEZON</span><span class="emp-sub">empresa</span>
+        </button>
+        <button class="btn-tipo" id="btn-rack" data-tipo="Rack">RACK</button>
+        <button class="btn-empresa" id="btn-walmar" data-emp="Walmar">
+          <span class="emp-logo-ph">WALMAR</span><span class="emp-sub">empresa</span>
+        </button>
+        <button class="btn-tipo" id="btn-dock" data-tipo="Loading">DOCKS</button>
+        <button class="btn-empresa" id="btn-popsi" data-emp="Popsi">
+          <span class="emp-logo-ph">POPSI</span><span class="emp-sub">empresa</span>
+        </button>
+        <button class="btn-tipo pallet-btn greyed" id="btn-pallet">
+          PALLET<br><span style="font-size:8px;font-weight:400">mounted</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- col 2: START/STOP stretch + karen compact bottom -->
+    <div class="ctrl-third" style="align-items:stretch;">
+      <div class="mid-btns">
+        <button class="btn-mid btn-mid-start" id="btnStartMid">▶ START</button>
+        <button class="btn-mid btn-mid-stop"  id="btnStopMid">■ STOP</button>
+      </div>
+      <div class="karen-row" id="karenRow" onclick="toggleVoz()" style="margin-top:6px;">
+        <div class="karen-wave" id="karenWave">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+        <span class="karen-label" id="karenLabel">mic · /voice_cmd</span>
+      </div>
+    </div>
+
+    <!-- col 3: fork height -->
+    <div class="ctrl-third">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted);margin-bottom:4px;text-transform:uppercase">Altura · /fork_cmd</div>
+      <div class="ht-body">
+        <div class="ht-slider">
+          <input type="range" class="vert" id="ht" min="0" max="23" step="0.1" value="2.10">
+          <div class="htval"><span id="htv">2.10</span><small>cmd</small></div>
+          <div class="htval"><span id="htfb" style="color:var(--cyan)">—</span><small>ToF</small></div>
+        </div>
+        <div class="ht-presets" id="presets"></div>
+      </div>
+      <div class="ht-cmd">
+        <div class="goht">
+          <input type="number" id="htNum" step="0.05" min="0" placeholder="cm" inputmode="decimal">
+          <span class="unit">cm</span>
+          <button id="htGo">▲ IR</button>
+        </div>
+        <div class="htstatus" id="htStatus">en reposo</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /grid -->
+
+<!-- CABINA -->
+<div id="cabina">
+  <img id="camCab" alt="">
+
+  <!-- top bar: exit + mode toggle + state display -->
+  <div class="cab-top" style="justify-content:space-between;">
+    <button class="cab-exit" id="cabExit">✕</button>
+    <!-- state nav -->
+    <div style="display:flex;align-items:center;gap:8px;pointer-events:auto;">
+      <button onclick="fsmNav(-1)" style="background:rgba(8,9,10,.6);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:5px 11px;font-family:var(--mono);font-size:14px;font-weight:700;backdrop-filter:blur(4px);">◀</button>
+      <div style="background:rgba(8,9,10,.65);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:5px 14px;backdrop-filter:blur(4px);font-family:var(--mono);font-size:12px;font-weight:800;color:#fff;min-width:140px;text-align:center;" id="cab-state-label">STALL</div>
+      <button onclick="fsmNav(1)"  style="background:rgba(8,9,10,.6);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:5px 11px;font-family:var(--mono);font-size:14px;font-weight:700;backdrop-filter:blur(4px);">▶</button>
+    </div>
+    <!-- mode toggle -->
+    <div style="display:flex;border:1px solid rgba(255,255,255,.25);border-radius:7px;overflow:hidden;font-family:var(--mono);font-size:11px;pointer-events:auto;">
+      <button id="cabManual" onclick="setMode('MANUAL')" style="background:var(--hazard);color:#111;border:0;padding:5px 10px;font-weight:700;">MANUAL</button>
+      <button id="cabFlow"   onclick="setMode('FLOW')"   style="background:rgba(8,9,10,.5);color:rgba(255,255,255,.6);border:0;padding:5px 10px;font-weight:700;">FLOW</button>
+    </div>
+  </div>
+
+  <!-- fork height presets — left side -->
+  <div id="cab-fork-panel" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:4px;max-height:70vh;overflow-y:auto;">
+  </div>
+
+  <button class="cab-stop" id="stopCab">STOP</button>
+  <div class="cab-joy" id="joyCab">
+    <div class="cross h"></div><div class="cross v"></div>
+    <div class="nub" id="nubCab"></div>
+  </div>
+</div>
+
+<script>
+const HOST = window.location.hostname || "10.42.0.1";
+const CFG = {
+  rosbridgePort:9090, videoPort:8080, voiceWsPort:9091,
+  videoBaseTopic:"/video_source", videoType:"ros_compressed",
+  cmdVelTopic:"/cmd_vel", forkCmdTopic:"/fork_cmd_name", forkFbTopic:"/fork_height",
+  forkStatusTopic:"/fork_status",
+  fsmTopic:"/fsm_state", targetTopic:"/target_select",
+  qrTopic:"/qr/detections", arucoTopic:"/aruco/detections",
+  navGoalTopic:"/nav_goal", navStatusTopic:"/nav_status",
+  mapRefreshHz:1,
+  vMax:0.20, wMax:1.50, pubHz:20, deadzone:0.08,
+  presets:[
+    ["Punto Alto",22.60],["Rack Arr. Agarre",22.35],["Rack Arr. Entrada",20.30],
+    ["Tránsito",15.60],["Loading Agarre",9.00],["Loading Entrada",6.70],
+    ["Rack Abj. Agarre",4.60],["Rack Abj. Entrada",3.00],["Base",2.10],
+  ],
+};
+const $ = id => document.getElementById(id);
+
+/* ── ROS ── */
+let ros, connected=false, cmdVel, forkCmdName, targetPub, startPub, voicePub, navGoalPub, uiCmdPub;
+
+function connect(){
+  ros = new ROSLIB.Ros({url:`ws://${HOST}:${CFG.rosbridgePort}`});
+  ros.on("connection",()=>{connected=true;setConn(true);setupTopics();});
+  ros.on("close",()=>{connected=false;setConn(false);setTimeout(connect,2000);});
+  ros.on("error",()=>{connected=false;setConn(false);});
+}
+function setConn(ok){
+  $("conn").classList.toggle("ok",ok);
+  $("connTxt").textContent=ok?"rosbridge":"sin conexión";
+}
+function sendUiCmd(action,payload={}){
+  if(!connected||!uiCmdPub)return;
+  uiCmdPub.publish(new ROSLIB.Message({data:JSON.stringify({action,payload})}));
+}
+function setupTopics(){
+  cmdVel     = new ROSLIB.Topic({ros,name:CFG.cmdVelTopic,messageType:"geometry_msgs/Twist"});
+  forkCmdName= new ROSLIB.Topic({ros,name:"/fork_cmd_name",messageType:"std_msgs/String"});
+  targetPub  = new ROSLIB.Topic({ros,name:CFG.targetTopic,messageType:"std_msgs/String"});
+  startPub   = new ROSLIB.Topic({ros,name:"/fsm_start",messageType:"std_msgs/String"});
+  voicePub   = new ROSLIB.Topic({ros,name:"/voice_cmd",messageType:"std_msgs/String"});
+  navGoalPub = new ROSLIB.Topic({ros,name:CFG.navGoalTopic,messageType:"geometry_msgs/Point"});
+  uiCmdPub   = new ROSLIB.Topic({ros,name:"/ui_cmd",messageType:"std_msgs/String"});
+
+  new ROSLIB.Topic({ros,name:'/pose_map/compressed',messageType:'sensor_msgs/CompressedImage'}).subscribe(m=>{
+    const img=$('kalmanImg');if(!img)return;img.src='data:image/jpeg;base64,'+m.data;
+  });
+  new ROSLIB.Topic({ros,name:"/fork_status",messageType:"std_msgs/String"}).subscribe(m=>{
+    if(m.data.startsWith("DONE"))setHtStatus("ok");
+    else if(m.data.startsWith("MOVING")||m.data.startsWith("AGARRE"))setHtStatus("move",$("htNum").value);
+    else if(m.data.startsWith("ERROR")||m.data.startsWith("TIMEOUT")){const el=$("htStatus");el.classList.remove("move","ok");el.textContent="⚠ "+m.data;}
+    else if(m.data==="BUSY"){const el=$("htStatus");el.classList.remove("move","ok");el.textContent="ocupado…";}
+  });
+  new ROSLIB.Topic({ros,name:'/logo_detections',messageType:'std_msgs/String'}).subscribe(m=>{
+    let d;try{d=JSON.parse(m.data);}catch(e){return;}drawLogos(d);
+  });
+  new ROSLIB.Topic({ros,name:CFG.fsmTopic,messageType:"std_msgs/String"}).subscribe(m=>{
+    let s=m.data;try{s=JSON.parse(m.data).state??m.data;}catch(e){}
+    if(typeof s==='string') updateFSM({state:s});
+  });
+  new ROSLIB.Topic({ros,name:"/fsm_mission",messageType:"std_msgs/String"}).subscribe(m=>{
+    try{updateFSM(JSON.parse(m.data));}catch(e){}
+  });
+  new ROSLIB.Topic({ros,name:"/empresa_detected",messageType:"std_msgs/String"}).subscribe(m=>{
+    const empName=m.data;
+    selEmpresa=empName;
+    empBtns.forEach(b=>{b.classList.toggle('sel',b.dataset.emp===empName);b.classList.toggle('greyed',b.dataset.emp!==empName);});
+  });
+  new ROSLIB.Topic({ros,name:CFG.forkFbTopic,messageType:"std_msgs/Float32"}).subscribe(m=>{
+    $("htfb").textContent=Number(m.data).toFixed(2);
+  });
+  new ROSLIB.Topic({ros,name:CFG.qrTopic,messageType:"std_msgs/String"}).subscribe(m=>{
+    let d;try{d=JSON.parse(m.data);}catch(e){return;}drawQR(d);
+  });
+  new ROSLIB.Topic({ros,name:CFG.arucoTopic,messageType:"std_msgs/String"}).subscribe(m=>{
+    let d;try{d=JSON.parse(m.data);}catch(e){return;}drawAruco(d);
+  });
+  new ROSLIB.Topic({ros,name:'/task_status',messageType:'std_msgs/String'}).subscribe(m=>{
+    const badge=$('task-status-badge');if(!badge)return;
+    badge.textContent=m.data;
+    const n=m.data.split(':')[0].toUpperCase();
+    badge.style.color=n==='ALIGN'?'var(--live)':n==='NAV'?'var(--hazard)':n==='QR'?'var(--cyan)':'var(--muted)';
+  });
+  new ROSLIB.Topic({ros,name:CFG.navStatusTopic,messageType:"std_msgs/String"}).subscribe(m=>{
+    const badge=$("nav-status-badge");
+    badge.textContent=m.data;
+    badge.style.color=m.data==="AREA_REACHED"?"var(--live)":m.data==="LOCALIZING"?"var(--danger)":"var(--hazard)";
+  });
+}
+
+/* ── FSM STATE MACHINE UI ── */
+let fsmData={state:'STALL',pallet:0,get:null,logo:null,empresa:null,mode:'MANUAL',log:''};
+let fsmSelectedNode='STALL';
+
+const FSM_NODES=['STALL','NAV_GET','ALIGN_GET','NAV_LOGO','ALIGN_LOGO','MISSION_DONE'];
+
+// per-node variable definitions — populated dynamically from fsmData
+function getNodeVars(nodeId){
+  const d=fsmData;
+  const get=d.get||'—', logo=d.logo||'—', empresa=d.empresa||'—', pallet=d.pallet??0;
+  const mode=d.mode||'MANUAL';
+  switch(nodeId){
+    case 'STALL': return [
+      {k:'estado',v:'STALL',c:''},
+      {k:'get',v:get,c:get!=='—'?'set':''},
+      {k:'logo',v:logo,c:logo!=='—'?'set':''},
+      {k:'empresa',v:empresa,c:empresa!=='—'?'set':''},
+      {k:'pallet',v:String(pallet),c:pallet?'live':''},
+      {k:'modo',v:mode,c:mode==='FLOW'?'live':'warn'},
+    ];
+    case 'NAV_GET': return [
+      {k:'cmd',v:get==='Rack'?'T1':get==='Dock'?'T2':'T1|T2',c:'set'},
+      {k:'get',v:get,c:get!=='—'?'set':'warn'},
+      {k:'pallet',v:String(pallet),c:''},
+      {k:'esperando',v:'NAV:QR_FOUND',c:'warn'},
+      {k:'nodo activo',v:'nav_node',c:'live'},
+      {k:'cmd_vel',v:'/nav/cmd_vel',c:''},
+    ];
+    case 'ALIGN_GET': return [
+      {k:'cmd',v:'T3',c:'set'},
+      {k:'empresa',v:empresa!=='—'?empresa:'detectando…',c:empresa!=='—'?'live':'warn'},
+      {k:'pallet',v:'0 → 1',c:'warn'},
+      {k:'esperando',v:'QR:DONE',c:'warn'},
+      {k:'nodo activo',v:'center_qr',c:'live'},
+      {k:'cmd_vel',v:'/qr/cmd_vel',c:''},
+    ];
+    case 'NAV_LOGO': return [
+      {k:'cmd',v:'T6:'+empresa,c:'set'},
+      {k:'empresa',v:empresa,c:empresa!=='—'?'live':'warn'},
+      {k:'pallet',v:String(pallet),c:pallet?'live':'warn'},
+      {k:'esperando',v:'NAV:LOGO_REACHED',c:'warn'},
+      {k:'nodo activo',v:'nav_node',c:'live'},
+      {k:'cmd_vel',v:'/nav/cmd_vel',c:''},
+    ];
+    case 'ALIGN_LOGO': return [
+      {k:'cmd',v:'T7:'+empresa,c:'set'},
+      {k:'empresa',v:empresa,c:empresa!=='—'?'live':'warn'},
+      {k:'pallet',v:String(pallet),c:pallet?'live':'warn'},
+      {k:'esperando',v:'ALIGN:DONE',c:'warn'},
+      {k:'nodo activo',v:'door_align',c:'live'},
+      {k:'cmd_vel',v:'/align/cmd_vel',c:''},
+    ];
+    case 'MISSION_DONE': return [
+      {k:'pallet',v:'0 (reset)',c:''},
+      {k:'empresa',v:'limpiado',c:''},
+      {k:'siguiente',v:'→ STALL',c:'live'},
+      {k:'log',v:d.log||'—',c:''},
+    ];
+    default: return [];
+  }
+}
+
+function fsmSelectNode(id){
+  fsmSelectedNode=id;
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('sel-node'));
+  document.querySelectorAll('.fb-wrap').forEach(w=>w.classList.remove('sel-wrap'));
+  const el=$('fb-'+id);if(el)el.classList.add('sel-node');
+  const wr=$('wrap-'+id);if(wr)wr.classList.add('sel-wrap');
+  // sync cabina state label
+  const cab=$('cab-state-label');if(cab)cab.textContent=id.replace('_',' ');
+  renderNodeVars(id);
+}
+
+function fsmNav(dir){
+  const idx=FSM_NODES.indexOf(fsmSelectedNode);
+  const next=FSM_NODES[Math.max(0,Math.min(FSM_NODES.length-1,idx+dir))];
+  fsmSelectNode(next);
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowLeft'){e.preventDefault();fsmNav(-1);}
+  else if(e.key==='ArrowRight'){e.preventDefault();fsmNav(1);}
+});
+
+function renderNodeVars(id){
+  const title=$('fsm-vars-title'), row=$('fsm-vars-row');
+  const labels={STALL:'STALL — inicio',NAV_GET:'NAV GET — navegando al pallet',
+    ALIGN_GET:'ALIGN GET — alineando QR',NAV_LOGO:'NAV LOGO — navegando al logo',
+    ALIGN_LOGO:'ALIGN LOGO — alineando logo',MISSION_DONE:'MISIÓN COMPLETA'};
+  title.textContent=labels[id]||id;
+  const vars=getNodeVars(id);
+  row.innerHTML=vars.map(v=>`<span class="fsm-chip ${v.c}">${v.k}: ${v.v}</span>`).join('');
+}
+
+function updateFSM(d){
+  if(typeof d==='string') d={state:d};
+  // merge preserving existing values
+  fsmData={...fsmData,...d};
+  const s=fsmData.state||'STALL';
+  const pallet=fsmData.pallet??0;
+
+  // bubble active/done
+  const seq=FSM_NODES;
+  const ai=seq.indexOf(s);
+  seq.forEach((id,i)=>{
+    const el=$('fb-'+id);if(!el)return;
+    el.classList.remove('active','done','paused-node');
+    if(id===s) el.classList.add('active');
+    else if(i<ai) el.classList.add('done');
+  });
+
+  // paused badge
+  const isPaused=s==='PAUSED';
+  $('paused-badge').style.display=isPaused?'block':'none';
+  if(isPaused && fsmData._prev_state) $('paused-at').textContent=fsmData._prev_state;
+
+  // update sub-labels
+  const get=fsmData.get||'—', empresa=fsmData.empresa||'—';
+  const subNAV_GET=$('sub-NAV_GET');   if(subNAV_GET) subNAV_GET.textContent=get!=='—'?get:'GET';
+  const subNAV_LOGO=$('sub-NAV_LOGO'); if(subNAV_LOGO) subNAV_LOGO.textContent=empresa!=='—'?empresa:'LOGO';
+  const subALIGN_GET=$('sub-ALIGN_GET'); if(subALIGN_GET) subALIGN_GET.textContent=empresa!=='—'?empresa:'QR';
+  const subALIGN_LOGO=$('sub-ALIGN_LOGO'); if(subALIGN_LOGO) subALIGN_LOGO.textContent=empresa!=='—'?empresa:'LOGO';
+
+  // log
+  const logEl=$('fsm-log');if(logEl&&fsmData.log)logEl.textContent=fsmData.log;
+
+  // start/pause button
+  const inactive=['STALL','IDLE','ERROR','MISSION_DONE'].includes(s);
+  if(inactive){
+    running=false;
+    $('btnStartMid').textContent='▶ START';
+    $('btnStartMid').classList.remove('pause');
+  }
+  if(isPaused){
+    $('btnStartMid').textContent='▶ RESUME';
+    $('btnStartMid').classList.add('pause');
+    // cambio 1: al pausar, forzar MANUAL en UI
+    if(mode!=='MANUAL'){
+      setMode('MANUAL');
+      sendUiCmd('SET_MODE',{mode:'MANUAL'});
+    }
+  } else if(!inactive && running){
+    $('btnStartMid').textContent='⏸ PAUSE';
+  }
+
+  // empresa buttons sync
+  if(fsmData.empresa){
+    const emp=fsmData.empresa;
+    empBtns.forEach(b=>{b.classList.toggle('sel',b.dataset.emp===emp);b.classList.toggle('greyed',b.dataset.emp!==emp);});
+    selEmpresa=emp;
+  }
+
+  // pallet btn
+  fsmVars.P=String(pallet);
+  updatePalletBtn();
+
+  // get btn
+  if(fsmData.get){
+    const tipoMap={Rack:'Rack',Dock:'Loading'};
+    const tipo=tipoMap[fsmData.get]||fsmData.get;
+    tipoBtns.forEach(b=>{b.classList.toggle('sel',b.dataset.tipo===tipo);b.classList.toggle('greyed',b.dataset.tipo!==tipo);});
+  }
+
+  // visual lock: apaga opacidad de selGrid cuando misión activa en FLOW
+  const locked=isMissionActive();
+  const grid=$('selGrid');
+  if(grid){
+    grid.style.opacity=locked?'0.45':'1';
+    grid.style.pointerEvents=locked?'none':'auto';
+    grid.title=locked?'Pausa la misión para cambiar selección':'';
+  }
+
+  // refresh selected node vars
+  renderNodeVars(fsmSelectedNode);
+  drawFSMArrows();
+}
+
+function drawFSMArrows(){
+  /* flex-row layout — arrows are static SVG inline, no redraw needed */
+}
+
+function gotoStep(stateName){
+  if(!connected||!uiCmdPub)return;
+  const s=fsmData.state||'STALL';
+  if(!['PAUSED','STALL','IDLE'].includes(s)){console.log('[gotoStep] ignorado:',s);return;}
+  // mandar variables actuales antes del salto para que el FSM las tenga
+  if(selEmpresa) sendUiCmd('SELECT_COMPANY',{company:selEmpresa});
+  if(selTipo){const mission=selTipo==='Rack'?'rack_truck':'loading_truck';sendUiCmd('SELECT_MISSION',{mission});}
+  new ROSLIB.Topic({ros,name:'/ui_goto_step',messageType:'std_msgs/String'}).publish(new ROSLIB.Message({data:stateName}));
+}
+
+let fsmVars={G:'—',S:'—',P:'—'};
+function refreshFSMVars(){}
+function setVar(){}
+
+function isMissionActive(){
+  const s=fsmData.state||'STALL';
+  // bloqueado si está corriendo en FLOW (no PAUSED, no STALL, no IDLE, no ERROR, no DONE)
+  return mode==='FLOW' && !['STALL','IDLE','PAUSED','ERROR','MISSION_DONE'].includes(s);
+}
+
+/* ── OVERLAYS ── */
+function drawQR(d){
+  const svg=$("ovl");if(!svg)return;
+  const qrs=d.qrs||[];
+  const locked=qrs.find(q=>q.locked)||qrs[0];
+  if(!locked||!locked.corners){svg.innerHTML="";return;}
+  const W=locked.img_w||1280,H=locked.img_h||720;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  let g='';
+  qrs.forEach(q=>{
+    if(!q.corners)return;
+    const sw=Math.max(2,W/320),r=Math.max(3,W/170),fs=Math.max(14,W/38);
+    const pts=q.corners.map(p=>p[0].toFixed(0)+","+p[1].toFixed(0)).join(" ");
+    const cx=q.corners.reduce((a,p)=>a+p[0],0)/q.corners.length;
+    const minY=Math.min(...q.corners.map(p=>p[1]));
+    const col=q.locked?'#ff4444':'#ff8888';
+    g+=`<polygon points="${pts}" fill="rgba(255,50,50,0.10)" stroke="${col}" stroke-width="${sw}"/>`;
+    g+=q.corners.map(p=>`<circle cx="${p[0].toFixed(0)}" cy="${p[1].toFixed(0)}" r="${r}" fill="#ff4444"/>`).join("");
+    g+=`<text x="${cx.toFixed(0)}" y="${(minY-12).toFixed(0)}" fill="${col}" font-family="monospace" font-size="${fs.toFixed(0)}" text-anchor="middle" font-weight="bold" paint-order="stroke" stroke="#000" stroke-width="${(sw*1.5).toFixed(1)}">${q.id||'QR'}</text>`;
+  });
+  svg.innerHTML=g;
+}
+function drawLogos(d){
+  const svg=$("ovl");if(!svg)return;
+  if(!d||!d.detections||d.detections.length===0){svg.innerHTML="";return;}
+  const img=$("cam");
+  const W=img.naturalWidth||1280,H=img.naturalHeight||720;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const sw=Math.max(2,W/320),fs=Math.max(14,W/38);
+  let g="";
+  d.detections.forEach(det=>{
+    const{x1,y1,x2,y2}=det.bbox;const cx=(x1+x2)/2;
+    g+=`<rect x="${x1}" y="${y1}" width="${x2-x1}" height="${y2-y1}" fill="rgba(55,150,255,0.08)" stroke="#3796ff" stroke-width="${sw}"/>`;
+    g+=`<text x="${cx}" y="${Math.max(y1-8,16)}" fill="#3796ff" font-family="monospace" font-size="${fs}" text-anchor="middle" font-weight="bold" paint-order="stroke" stroke="#000" stroke-width="${(sw*1.5).toFixed(1)}">${det.class_name} ${det.confidence}</text>`;
+  });
+  svg.innerHTML=g;
+}
+function drawAruco(detections){
+  const svg=$("ovl");if(!svg)return;
+  if(!detections||detections.length===0){svg.innerHTML="";return;}
+  const img=$("cam");
+  const W=img.naturalWidth||1280,H=img.naturalHeight||720;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const sw=Math.max(2,W/320),fs=Math.max(14,W/38),r=Math.max(3,W/170);
+  let g="";
+  detections.forEach(d=>{
+    if(!d.corners)return;
+    const pts=d.corners.map(p=>p[0].toFixed(0)+","+p[1].toFixed(0)).join(" ");
+    const cx=d.corners.reduce((a,p)=>a+p[0],0)/d.corners.length;
+    const minY=Math.min(...d.corners.map(p=>p[1]));
+    g+=`<polygon points="${pts}" fill="rgba(57,217,138,0.10)" stroke="#39d98a" stroke-width="${sw}"/>`;
+    g+=d.corners.map(p=>`<circle cx="${p[0].toFixed(0)}" cy="${p[1].toFixed(0)}" r="${r}" fill="#37c3ff"/>`).join("");
+    g+=`<text x="${cx.toFixed(0)}" y="${(minY-12).toFixed(0)}" fill="#39d98a" font-family="monospace" font-size="${fs.toFixed(0)}" text-anchor="middle" font-weight="bold" paint-order="stroke" stroke="#000" stroke-width="${(sw*1.5).toFixed(1)}">ID${d.id} ${d.distance_m}m yaw=${d.yaw_deg}°</text>`;
+  });
+  svg.innerHTML=g;
+}
+
+/* ── MAPA ── */
+let mapLive=true;
+function startMapRefresh(){
+  setInterval(()=>{
+    if(!mapLive)return;
+    const img=$("mapImg");if(!img)return;
+    const base=img.src.split("?")[0];
+    const tmp=new Image();
+    tmp.onload=()=>{img.src=tmp.src;};
+    tmp.src=base+"?t="+Date.now();
+  },Math.round(1000/CFG.mapRefreshHz));
+}
+$("mMapLive").onclick=()=>{mapLive=true;$("mMapLive").classList.add("on");$("mMapStatic").classList.remove("on");};
+$("mMapStatic").onclick=()=>{mapLive=false;$("mMapStatic").classList.add("on");$("mMapLive").classList.remove("on");};
+
+$("mapImg").addEventListener("click",(e)=>{
+  if(!connected||!navGoalPub)return;
+  const stageRect=$("mapStage").getBoundingClientRect();
+  const cx=e.clientX-stageRect.left,cy=e.clientY-stageRect.top;
+  const BOX_LEFT=80,BOX_TOP=15,BOX_W=380,BOX_H=300;
+  if(cx<BOX_LEFT||cx>BOX_LEFT+BOX_W||cy<BOX_TOP||cy>BOX_TOP+BOX_H)return;
+  const wx=((cy-BOX_TOP)/BOX_H)*3.6,wy=((cx-BOX_LEFT)/BOX_W)*4.6;
+  navGoalPub.publish(new ROSLIB.Message({x:wx,y:wy,z:0.0}));
+  const dot=document.createElement("div");
+  dot.style.cssText=`position:absolute;width:12px;height:12px;border-radius:50%;background:var(--hazard);border:2px solid #fff;pointer-events:none;left:${cx-6}px;top:${cy-6}px;box-shadow:0 0 8px var(--hazard);z-index:15;transition:opacity .5s;`;
+  $("mapStage").appendChild(dot);
+  const badge=$("map-goal-badge");
+  badge.textContent=`📍 (${wx.toFixed(2)}, ${wy.toFixed(2)}) m`;
+  badge.style.display="block";
+  setTimeout(()=>{dot.style.opacity="0";setTimeout(()=>dot.remove(),500);},1200);
+  setTimeout(()=>{badge.style.display="none";},2500);
+});
+
+/* ── VOZ ── */
+let voiceWs=null,grabandoVoz=false,mediaStream=null,audioCtx=null,scriptProcessor=null;
+function conectarVoiceWs(){
+  voiceWs=new WebSocket(`ws://${HOST}:${CFG.voiceWsPort}`);
+  voiceWs.binaryType="arraybuffer";
+  voiceWs.onopen=()=>console.log("[voz] WS conectado");
+  voiceWs.onclose=()=>{setTimeout(conectarVoiceWs,2000);};
+  voiceWs.onerror=()=>{};
+  voiceWs.onmessage=(e)=>{
+    const[estado,palabra]=e.data.split(":");
+    const label=$("karenLabel");
+    if(estado==="aceptado"){
+      label.textContent="▶ "+palabra;label.style.color="var(--live)";
+      if(connected&&voicePub)voicePub.publish(new ROSLIB.Message({data:palabra}));
+      const cmd=palabra.toUpperCase().trim();
+      if(cmd==="START"||cmd==="INICIO"||cmd==="GO"){
+        if(!running) doStart();
+      } else if(cmd==="STOP"||cmd==="ALTO"||cmd==="PARA"){
+        doStop();
+      } else if(cmd==="PAUSE"||cmd==="PAUSA"){
+        if(running) doStart();
+      }
+    }else{
+      label.textContent=palabra==="audio_corto"?"muy corto":"no reconocido";
+      label.style.color="var(--danger)";
+    }
+    setTimeout(()=>{label.textContent="mic · /voice_cmd";label.style.color="";},2500);
+  };
+}
+async function toggleVoz(){
+  const wave=$("karenWave"),row=$("karenRow"),label=$("karenLabel");
+  if(grabandoVoz){
+    grabandoVoz=false;wave.classList.remove("active");row.classList.remove("mic-on");
+    label.textContent="mic · /voice_cmd";label.style.color="";
+    if(scriptProcessor){scriptProcessor.disconnect();scriptProcessor=null;}
+    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+    if(audioCtx){audioCtx.close();audioCtx=null;}
+    return;
+  }
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:16000,channelCount:1,echoCancellation:true,noiseSuppression:true},video:false});
+    audioCtx=new AudioContext({sampleRate:16000});
+    const source=audioCtx.createMediaStreamSource(mediaStream);
+    scriptProcessor=audioCtx.createScriptProcessor(4096,1,1);
+    let chunks=[],silenceFrames=0,voiceFrames=0,recording=false;
+    let THRESHOLD=0.018;
+    const UMBRAL_BASE=0.018,FACTOR_RUIDO=3.0,CALIB_MS=1500;
+    let calibrando=true,tCalibInicio=null,rmsCalib=[];
+    const SILENCE_LIM=7,VOICE_MIN=3;
+    scriptProcessor.onaudioprocess=(e)=>{
+      if(!grabandoVoz)return;
+      const data=e.inputBuffer.getChannelData(0);
+      const rms=Math.sqrt(data.reduce((s,v)=>s+v*v,0)/data.length);
+      if(calibrando){
+        if(tCalibInicio===null)tCalibInicio=performance.now();
+        rmsCalib.push(rms);
+        if(performance.now()-tCalibInicio>=CALIB_MS){
+          const prom=rmsCalib.reduce((a,b)=>a+b,0)/rmsCalib.length;
+          const max=Math.max(...rmsCalib);
+          THRESHOLD=Math.max(UMBRAL_BASE,prom*FACTOR_RUIDO,max*1.20);
+          calibrando=false;label.textContent="🎙 escuchando";label.style.color="var(--cyan)";
+        }
+        return;
+      }
+      if(rms>THRESHOLD){
+        voiceFrames++;silenceFrames=0;
+        if(!recording&&voiceFrames>=VOICE_MIN){recording=true;chunks=[];}
+        if(recording)chunks.push(new Float32Array(data));
+      }else{
+        if(!recording){voiceFrames=0;}
+        else{
+          chunks.push(new Float32Array(data));silenceFrames++;
+          if(silenceFrames>=SILENCE_LIM){
+            const total=chunks.reduce((s,c)=>s+c.length,0);
+            const buf=new Float32Array(total);let off=0;
+            chunks.forEach(c=>{buf.set(c,off);off+=c.length;});
+            if(voiceWs&&voiceWs.readyState===WebSocket.OPEN)voiceWs.send(buf.buffer);
+            recording=false;chunks=[];voiceFrames=0;silenceFrames=0;
+          }
+        }
+      }
+    };
+    source.connect(scriptProcessor);scriptProcessor.connect(audioCtx.destination);
+    grabandoVoz=true;wave.classList.add("active");row.classList.add("mic-on");
+    label.textContent="calibrando…";label.style.color="var(--hazard)";
+  }catch(err){alert("No se pudo acceder al micrófono:\n"+err.message);}
+}
+
+/* ── MODO MANUAL/FLOW ── */
+let mode="MANUAL";
+function setMode(m){
+  mode=m;
+  $("mManual").classList.toggle("on",m==="MANUAL");
+  $("mFlow").classList.toggle("on",m==="FLOW");
+  document.querySelectorAll(".cab-joy").forEach(j=>j.classList.toggle("flow",m!=="MANUAL"));
+  if(m!=="MANUAL"){resetJoy();publishTwist(0,0);}
+  // sync cabina buttons
+  const cm=$("cabManual"),cf=$("cabFlow");
+  if(cm&&cf){
+    cm.style.background=m==="MANUAL"?"var(--hazard)":"rgba(8,9,10,.5)";
+    cm.style.color=m==="MANUAL"?"#111":"rgba(255,255,255,.6)";
+    cf.style.background=m==="FLOW"?"var(--cyan)":"rgba(8,9,10,.5)";
+    cf.style.color=m==="FLOW"?"#111":"rgba(255,255,255,.6)";
+  }
+}
+$("mManual").onclick=()=>{setMode("MANUAL");sendUiCmd("SET_MODE",{mode:"MANUAL"});if(connected){new ROSLIB.Topic({ros,name:'/ui_mode',messageType:'std_msgs/String'}).publish(new ROSLIB.Message({data:"MANUAL"}));}};
+$("mFlow").onclick=()=>{setMode("FLOW");sendUiCmd("SET_MODE",{mode:"FLOW"});if(connected){new ROSLIB.Topic({ros,name:'/ui_mode',messageType:'std_msgs/String'}).publish(new ROSLIB.Message({data:"FLOW"}));}};
+
+/* ── START / PAUSE ── */
+let running=false;
+function doStart(){
+  running=!running;
+  const b=$("btnStartMid");
+  b.textContent=running?"⏸ PAUSE":"▶ START";
+  b.classList.toggle("pause",running);
+  if(connected&&startPub)startPub.publish(new ROSLIB.Message({data:running?"START":"PAUSE"}));
+  sendUiCmd(running?"START":"PAUSE");
+  navigator.vibrate&&navigator.vibrate(20);
+}
+$("btnStartMid").addEventListener("pointerdown",doStart);
+
+/* ── STOP ── */
+function doStop(){
+  running=false;
+  const b=$("btnStartMid");
+  b.textContent="▶ START";b.classList.remove("pause");
+  resetJoy();
+  for(let i=0;i<3;i++)publishTwist(0,0);
+  if(connected&&startPub)startPub.publish(new ROSLIB.Message({data:"STOP"}));
+  sendUiCmd("STOP");
+  navigator.vibrate&&navigator.vibrate(40);
+}
+[$("btnStopMid"),$("stopCab")].forEach(b=>b.addEventListener("pointerdown",doStop));
+
+/* ── JOYSTICK ── */
+let jx=0,jy=0,curNub=null;
+const ptr={};
+function bindJoy(joyEl,nubEl){
+  function ev(e){
+    if(mode!=="MANUAL")return;
+    const r=joyEl.getBoundingClientRect();
+    const cx=r.left+r.width/2,cy=r.top+r.height/2;
+    let dx=(e.clientX-cx)/(r.width/2),dy=(e.clientY-cy)/(r.height/2);
+    const mag=Math.hypot(dx,dy);if(mag>1){dx/=mag;dy/=mag;}
+    jx=dx;jy=dy;curNub=nubEl;
+    nubEl.style.transform=`translate(${dx*48}%,${dy*48}%)`;
+  }
+  joyEl.addEventListener("pointerdown",e=>{if(mode!=="MANUAL")return;ptr[joyEl.id]=e.pointerId;joyEl.setPointerCapture(e.pointerId);ev(e);});
+  joyEl.addEventListener("pointermove",e=>{if(ptr[joyEl.id]===e.pointerId)ev(e);});
+  const up=e=>{if(ptr[joyEl.id]===e.pointerId){ptr[joyEl.id]=null;resetJoy();publishTwist(0,0);}};
+  joyEl.addEventListener("pointerup",up);
+  joyEl.addEventListener("pointercancel",up);
+}
+function resetJoy(){jx=0;jy=0;if(curNub)curNub.style.transform="translate(0,0)";}
+bindJoy($("joyCab"),$("nubCab"));
+
+function dz(v){return Math.abs(v)<CFG.deadzone?0:v;}
+function publishTwist(v,w){
+  if(!connected||!cmdVel)return;
+  cmdVel.publish(new ROSLIB.Message({linear:{x:v,y:0,z:0},angular:{x:0,y:0,z:w}}));
+}
+const anyDown=()=>Object.values(ptr).some(v=>v!=null);
+setInterval(()=>{
+  if(mode!=="MANUAL")return;
+  const v=dz(-jy)*CFG.vMax,w=dz(-jx)*CFG.wMax;
+  if(anyDown()||v||w)publishTwist(v,w);
+},Math.round(1000/CFG.pubHz));
+
+/* ── CÁMARA ── */
+function camURL(){return`http://${HOST}:${CFG.videoPort}/stream?topic=${CFG.videoBaseTopic}&type=${CFG.videoType}&t=${Date.now()}`;}
+function startCam(){
+  const url=camURL(),img=$("cam");
+  img.onload=()=>{$("camPh").style.display="none";img.style.display="block";$("rate").textContent="● LIVE";};
+  img.onerror=()=>{$("camPh").style.display="block";img.style.display="none";$("camPh").textContent="cámara no disponible — reintentando…";setTimeout(startCam,2500);};
+  img.style.display="none";img.src=url;
+}
+
+/* ── SELECTOR EMPRESA + TIPO ── */
+let selEmpresa=null,selTipo=null;
+const empBtns=document.querySelectorAll(".btn-empresa");
+const tipoBtns=document.querySelectorAll(".btn-tipo[data-tipo]");
+
+empBtns.forEach(btn=>{
+  btn.addEventListener("pointerdown",()=>{
+    if(isMissionActive()) return; // bloqueado en FLOW activo
+    const emp=btn.dataset.emp;
+    if(selEmpresa===emp){selEmpresa=null;empBtns.forEach(b=>b.classList.remove("sel","greyed"));}
+    else{
+      selEmpresa=emp;
+      empBtns.forEach(b=>{b.classList.toggle("sel",b.dataset.emp===emp);b.classList.toggle("greyed",b.dataset.emp!==emp);});
+      fsmVars.S=emp;
+    }
+    publishTarget();
+  });
+});
+tipoBtns.forEach(btn=>{
+  btn.addEventListener("pointerdown",()=>{
+    if(isMissionActive()) return; // bloqueado en FLOW activo
+    const tipo=btn.dataset.tipo;
+    if(selTipo===tipo){selTipo=null;tipoBtns.forEach(b=>b.classList.remove("sel","greyed"));}
+    else{
+      selTipo=tipo;
+      tipoBtns.forEach(b=>{b.classList.remove("greyed");b.classList.toggle("sel",b.dataset.tipo===tipo);b.classList.toggle("greyed",b.dataset.tipo!==tipo);});
+      fsmVars.G=tipo;
+    }
+    publishTarget();
+  });
+});
+
+function updatePalletBtn(){
+  const btn=$("btn-pallet");if(!btn)return;
+  const mounted=(fsmVars.P==="1"||fsmVars.P===1);
+  btn.classList.toggle("mounted",mounted);btn.classList.toggle("greyed",!mounted);
+  btn.innerHTML=mounted?`🟢 PALLET<br><span style="font-size:8px;font-weight:400">mounted</span>`:`PALLET<br><span style="font-size:8px;font-weight:400">mounted</span>`;
+}
+$("btn-pallet").addEventListener("pointerdown",()=>{
+  if(isMissionActive()) return; // bloqueado en FLOW activo
+  fsmVars.P=(fsmVars.P==="1"||fsmVars.P===1)?"0":"1";
+  updatePalletBtn();publishTarget();
+});
+
+function publishTarget(){
+  $("ttarget").textContent=`target ${selEmpresa??"—"}/${selTipo??"—"}`;
+  if(connected&&targetPub)targetPub.publish(new ROSLIB.Message({data:JSON.stringify({company:selEmpresa,tipo:selTipo})}));
+  if(selEmpresa)sendUiCmd("SELECT_COMPANY",{company:selEmpresa});
+  if(selTipo){const mission=selTipo==="Rack"?"rack_truck":"loading_truck";sendUiCmd("SELECT_MISSION",{mission});}
+}
+
+/* ── ALTURA ── */
+function setHeightUI(cm){cm=Number(cm);$("ht").value=cm;$("htNum").value=cm.toFixed(2);$("htv").textContent=cm.toFixed(2);}
+function setHtStatus(state,cm){
+  const el=$("htStatus");el.classList.remove("move","ok");
+  if(state==="move"){el.classList.add("move");el.textContent=`→ ${Number(cm).toFixed(2)} cm`;}
+  else if(state==="ok"){el.classList.add("ok");el.textContent="✓ alcanzada";}
+  else el.textContent="en reposo";
+}
+function publishFork(cm){
+  cm=Number(cm);if(isNaN(cm))return;
+  setHeightUI(cm);setHtStatus("move",cm);
+  if(connected&&forkCmdName)forkCmdName.publish(new ROSLIB.Message({data:String(cm)}));
+}
+$("htGo").addEventListener("click",()=>{clearPresetSel();publishFork(+$("htNum").value);});
+$("htNum").addEventListener("keydown",e=>{if(e.key==="Enter"){clearPresetSel();publishFork(+$("htNum").value);}});
+$("ht").addEventListener("input",()=>{clearPresetSel();setHeightUI($("ht").value);});
+$("ht").addEventListener("change",()=>publishFork(+$("ht").value));
+
+const presetsEl=$("presets");
+CFG.presets.forEach(([name,cm])=>{
+  const b=document.createElement("button");b.className="preset";
+  b.innerHTML=`<b>${cm.toFixed(1)}</b> ${name}`;
+  b.onclick=()=>{clearPresetSel();b.classList.add("sel");publishFork(cm);};
+  presetsEl.appendChild(b);
+});
+function clearPresetSel(){presetsEl.querySelectorAll(".preset").forEach(p=>p.classList.remove("sel"));}
+
+/* ── CABINA ── */
+const cabina=$("cabina");
+$("expand").onclick=async()=>{
+  $("camCab").src=camURL();cabina.classList.add("show");
+  // populate fork presets in cabina
+  const fp=$("cab-fork-panel");
+  if(fp&&fp.children.length===0){
+    CFG.presets.forEach(([name,cm])=>{
+      const b=document.createElement("button");
+      b.className="cab-preset";
+      b.innerHTML=`<b style="color:var(--hazard);font-size:11px;">${cm.toFixed(1)}</b> ${name}`;
+      b.onclick=()=>{
+        fp.querySelectorAll(".cab-preset").forEach(x=>x.classList.remove("sel"));
+        b.classList.add("sel");
+        publishFork(cm);
+      };
+      fp.appendChild(b);
+    });
+  }
+  // sync mode buttons in cabina
+  const cm=$("cabManual"),cf=$("cabFlow");
+  if(cm&&cf){
+    cm.style.background=mode==="MANUAL"?"var(--hazard)":"rgba(8,9,10,.5)";
+    cm.style.color=mode==="MANUAL"?"#111":"rgba(255,255,255,.6)";
+    cf.style.background=mode==="FLOW"?"var(--cyan)":"rgba(8,9,10,.5)";
+    cf.style.color=mode==="FLOW"?"#111":"rgba(255,255,255,.6)";
+  }
+  try{await cabina.requestFullscreen?.();}catch(e){}
+  try{await screen.orientation?.lock?.("landscape");}catch(e){}
+};
+$("cabExit").onclick=async()=>{
+  cabina.classList.remove("show");$("camCab").src="";
+  try{screen.orientation?.unlock?.();}catch(e){}
+  try{if(document.fullscreenElement)await document.exitFullscreen();}catch(e){}
+};
+
+/* ── MAP TABS ── */
+let mapTab='path';
+function setMapTab(t){
+  mapTab=t;
+  $('mapStage').style.display=t==='path'?'flex':'none';
+  $('mapKalman').style.display=t==='kalman'?'flex':'none';
+  $('tabPath').style.background=t==='path'?'var(--hazard)':'var(--panel2)';
+  $('tabPath').style.color=t==='path'?'#111':'var(--muted)';
+  $('tabKalman').style.background=t==='kalman'?'var(--hazard)':'var(--panel2)';
+  $('tabKalman').style.color=t==='kalman'?'#111':'var(--muted)';
+}
+
+/* ── INIT ── */
+setMode("MANUAL");
+connect();
+startCam();
+conectarVoiceWs();
+startMapRefresh();
+fsmSelectNode('STALL');
+setTimeout(drawFSMArrows,500);
+window.addEventListener('resize',drawFSMArrows);
+</script>
+</body>
+</html>

@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BOTONI · Mobile</title>
+<script src="roslib.min.js"></script>
+<style>
+  :root{
+    --bg:#0e0f11; --panel:#16181c; --panel2:#1d2024; --line:#2a2e34;
+    --ink:#ecebe6; --muted:#868d97;
+    --hazard:#f5c518; --live:#39d98a; --cyan:#37c3ff; --danger:#ff4d4d;
+    --mono: ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    width:100%; height:100%;
+    background:#000; color:var(--ink);
+    overflow:hidden; user-select:none; -webkit-user-select:none;
+  }
+
+  /* ── FONDO: cámara ──────────────────────────────────── */
+  #cam-bg{
+    position:fixed; inset:0; width:100%; height:100%;
+    object-fit:cover; z-index:0; background:#000;
+  }
+  #cam-ph{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:12px; color:var(--muted); z-index:1;
+  }
+
+  /* ── HUD IZQUIERDO: fork SVG + slider + mic ─────────── */
+  #hud-left{
+    position:fixed; left:0; top:0; bottom:0;
+    width:100px;
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:space-between;
+    padding: env(safe-area-inset-top,12px) 0 env(safe-area-inset-bottom,20px) env(safe-area-inset-left,8px);
+    z-index:10;
+  }
+
+  /* forklift SVG animado */
+  #fork-wrap{
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    flex-shrink:0;
+  }
+  #fork-svg{ width:56px; height:90px; }
+  .fork-body{ fill:#ecebe6; }
+  .fork-mast{ fill:#868d97; }
+  .fork-tines{ fill:var(--hazard); transition: transform .3s ease; }
+  #fork-val{
+    font-family:var(--mono); font-size:11px; font-weight:800;
+    color:var(--hazard); text-align:center; line-height:1.2;
+  }
+  #fork-val small{ display:block; font-size:8px; color:var(--muted); font-weight:400; }
+
+  /* slider vertical */
+  #ht-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0; }
+  input[type=range].vert{
+    writing-mode:vertical-lr; direction:rtl;
+    width:32px; flex:1;
+    accent-color:var(--hazard);
+    background:transparent;
+  }
+  #htfb-mob{
+    font-family:var(--mono); font-size:10px; color:var(--cyan);
+    text-align:center; line-height:1.3;
+  }
+  #htfb-mob small{ display:block; font-size:7px; color:var(--muted); }
+
+  /* botón mic */
+  #btn-mic{
+    width:56px; height:56px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.25);
+    background:rgba(14,15,17,.55); backdrop-filter:blur(6px);
+    color:var(--muted); font-size:22px;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; cursor:pointer; transition: border-color .2s, color .2s, box-shadow .2s;
+  }
+  #btn-mic.active{
+    border-color:var(--cyan); color:var(--cyan);
+    box-shadow:0 0 0 3px rgba(55,195,255,.35);
+  }
+  #btn-mic.result-ok{
+    border-color:var(--live); color:var(--live);
+    box-shadow:0 0 0 3px rgba(57,217,138,.35);
+  }
+  #btn-mic.result-err{
+    border-color:var(--danger); color:var(--danger);
+    box-shadow:0 0 0 3px rgba(255,77,77,.35);
+  }
+  #mic-label{
+    font-family:var(--mono); font-size:8px; color:var(--muted);
+    text-align:center; max-width:60px; word-break:break-word;
+    transition:color .3s;
+  }
+
+  /* ── JOYSTICK DERECHO ───────────────────────────────── */
+  #joy{
+    position:fixed;
+    right: env(safe-area-inset-right,20px);
+    bottom: env(safe-area-inset-bottom,24px);
+    width:min(46vw, 210px); aspect-ratio:1/1;
+    border-radius:50%;
+    background:rgba(20,22,26,.28); border:2px solid rgba(255,255,255,.18);
+    backdrop-filter:blur(3px); touch-action:none; z-index:10;
+  }
+  #joy .cross{ background:rgba(255,255,255,.12); position:absolute; }
+  #joy .cross.h{ left:12px; right:12px; top:50%; height:1px; }
+  #joy .cross.v{ top:12px; bottom:12px; left:50%; width:1px; }
+  #joy .nub{
+    position:absolute; width:34%; height:34%; left:33%; top:33%;
+    border-radius:50%; transition:transform .04s linear;
+    background:radial-gradient(circle at 40% 35%,
+      rgba(255,224,102,.95), rgba(245,197,24,.85) 55%, rgba(184,148,15,.85));
+    border:2px solid rgba(0,0,0,.45);
+  }
+
+  /* ── STOP central ───────────────────────────────────── */
+  #btn-stop{
+    position:fixed;
+    bottom: env(safe-area-inset-bottom,24px);
+    left:50%; transform:translateX(-50%);
+    width:64px; height:64px; border-radius:50%;
+    background:rgba(255,77,77,.85); color:#fff;
+    border:2px solid #fff; font-family:var(--mono);
+    font-size:11px; font-weight:800; z-index:10;
+    backdrop-filter:blur(4px);
+  }
+
+  /* ── PILL conexión top-right ────────────────────────── */
+  #conn-pill{
+    position:fixed;
+    top: env(safe-area-inset-top,10px);
+    right: env(safe-area-inset-right,10px);
+    font-family:var(--mono); font-size:9px; padding:3px 8px; border-radius:999px;
+    border:1px solid var(--line); display:flex; align-items:center; gap:5px;
+    background:rgba(22,24,28,.7); backdrop-filter:blur(4px); z-index:10;
+    color:var(--muted);
+  }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--danger); }
+  #conn-pill.ok .dot{ background:var(--live); box-shadow:0 0 5px var(--live); }
+  #conn-pill.ok{ color:var(--live); }
+
+  /* ── FSM badge top-center ───────────────────────────── */
+  #fsm-badge{
+    position:fixed;
+    top: env(safe-area-inset-top,10px);
+    left:50%; transform:translateX(-50%);
+    font-family:var(--mono); font-size:10px; font-weight:800;
+    padding:4px 12px; border-radius:999px;
+    background:rgba(22,24,28,.7); border:1px solid var(--line);
+    backdrop-filter:blur(4px); color:var(--hazard); z-index:10;
+    letter-spacing:.8px; white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+
+<!-- Cámara de fondo -->
+<img id="cam-bg" alt="">
+<div id="cam-ph">conectando cámara…</div>
+
+<!-- Pill conexión -->
+<div id="conn-pill"><span class="dot"></span><span id="conn-txt">…</span></div>
+
+<!-- FSM badge -->
+<div id="fsm-badge" id="fsm-badge">—</div>
+
+<!-- HUD izquierdo -->
+<div id="hud-left">
+
+  <!-- Forklift SVG animado -->
+  <div id="fork-wrap">
+    <svg id="fork-svg" viewBox="0 0 56 90" xmlns="http://www.w3.org/2000/svg">
+      <!-- mástil -->
+      <rect class="fork-mast" x="22" y="5" width="12" height="70" rx="2"/>
+      <!-- cuerpo base -->
+      <rect class="fork-body" x="10" y="62" width="36" height="22" rx="3"/>
+      <!-- ruedas -->
+      <circle cx="16" cy="86" r="5" fill="#444"/>
+      <circle cx="40" cy="86" r="5" fill="#444"/>
+      <!-- horquillas animadas (translate Y de 0=arriba a 50=abajo) -->
+      <g class="fork-tines" id="fork-tines-svg">
+        <rect x="24" y="30" width="5" height="28" rx="1"/>
+        <rect x="32" y="30" width="5" height="28" rx="1"/>
+        <rect x="20" y="56" width="20" height="4" rx="1"/>
+      </g>
+    </svg>
+    <div id="fork-val">
+      <span id="htv-mob">—</span>
+      <small>cmd cm</small>
+    </div>
+  </div>
+
+  <!-- Slider vertical -->
+  <div id="ht-wrap">
+    <input type="range" class="vert" id="ht-mob" min="0" max="20" step="0.1" value="0">
+    <div id="htfb-mob"><span id="htfb-val">—</span><small>ToF cm</small></div>
+  </div>
+
+  <!-- Mic + label -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+    <button id="btn-mic">🎙</button>
+    <span id="mic-label">/voice</span>
+  </div>
+
+</div>
+
+<!-- Joystick -->
+<div id="joy">
+  <div class="cross h"></div>
+  <div class="cross v"></div>
+  <div class="nub" id="nub"></div>
+</div>
+
+<!-- STOP -->
+<button id="btn-stop">STOP</button>
+
+<script>
+const HOST = window.location.hostname || "10.42.0.1";
+const CFG = {
+  rosbridgePort: 9090, videoPort: 8080, voiceWsPort: 9091,
+  videoBaseTopic: "/video_source", videoType: "ros_compressed",
+  cmdVelTopic: "/cmd_vel", forkCmdTopic: "/fork_cmd",
+  forkFbTopic: "/fork_height", forkDoneTopic: "/fork_done",
+  fsmTopic: "/fsm_state",
+  vMax: 0.20, wMax: 1.50, pubHz: 20, deadzone: 0.08,
+  // rango real de las horquillas en cm
+  forkMin: 0, forkMax: 20,
+};
+const $ = id => document.getElementById(id);
+
+/* ── ROS ─────────────────────────────────────────────── */
+let ros, connected = false, cmdVel, forkCmd, voicePub;
+
+function connect(){
+  ros = new ROSLIB.Ros({ url: `ws://${HOST}:${CFG.rosbridgePort}` });
+  ros.on("connection", ()=>{ connected=true;  setConn(true);  setupTopics(); });
+  ros.on("close",      ()=>{ connected=false; setConn(false); setTimeout(connect,2000); });
+  ros.on("error",      ()=>{ connected=false; setConn(false); });
+}
+function setConn(ok){
+  const pill = $("conn-pill");
+  pill.classList.toggle("ok", ok);
+  $("conn-txt").textContent = ok ? "ROS" : "…";
+}
+function setupTopics(){
+  cmdVel  = new ROSLIB.Topic({ros, name:CFG.cmdVelTopic,  messageType:"geometry_msgs/Twist"});
+  forkCmd = new ROSLIB.Topic({ros, name:CFG.forkCmdTopic, messageType:"std_msgs/Float32"});
+  voicePub= new ROSLIB.Topic({ros, name:"/voice_cmd",     messageType:"std_msgs/String"});
+
+  new ROSLIB.Topic({ros,name:CFG.forkFbTopic,messageType:"std_msgs/Float32"}).subscribe(m=>{
+    const v = Number(m.data).toFixed(1);
+    $("htfb-val").textContent = v;
+    animateFork(Number(m.data));
+  });
+  new ROSLIB.Topic({ros,name:CFG.fsmTopic,messageType:"std_msgs/String"}).subscribe(m=>{
+    let s=m.data; try{s=JSON.parse(m.data).state??m.data;}catch(e){}
+    $("fsm-badge").textContent = s;
+  });
+}
+
+/* ── CÁMARA ─────────────────────────────────────────── */
+function camURL(){ return `http://${HOST}:${CFG.videoPort}/stream?topic=${CFG.videoBaseTopic}&type=${CFG.videoType}&t=${Date.now()}`; }
+function startCam(){
+  const img = $("cam-bg");
+  img.onload  = ()=>{ $("cam-ph").style.display="none"; img.style.display="block"; };
+  img.onerror = ()=>{ $("cam-ph").style.display="flex"; img.style.display="none"; setTimeout(startCam,2500); };
+  img.style.display="none"; img.src=camURL();
+}
+
+/* ── FORK SVG ANIMATION ─────────────────────────────── */
+function animateFork(cm){
+  // mapea 0cm→translateY(30), 20cm→translateY(-30)
+  const pct = Math.min(Math.max(cm / CFG.forkMax, 0), 1);
+  const ty  = 30 - pct * 60;
+  $("fork-tines-svg").style.transform = `translateY(${ty.toFixed(1)}px)`;
+  $("htv-mob").textContent = cm.toFixed(1);
+}
+
+/* ── SLIDER ─────────────────────────────────────────── */
+$("ht-mob").addEventListener("input", ()=>{
+  const cm = Number($("ht-mob").value);
+  $("htv-mob").textContent = cm.toFixed(1);
+  animateFork(cm);
+});
+$("ht-mob").addEventListener("change", ()=>{
+  const cm = Number($("ht-mob").value);
+  if(connected && forkCmd) forkCmd.publish(new ROSLIB.Message({data:cm}));
+});
+
+/* ── JOYSTICK ───────────────────────────────────────── */
+let jx=0, jy=0;
+const ptr = {};
+const joy = $("joy"), nub = $("nub");
+
+function joyEv(e){
+  const r  = joy.getBoundingClientRect();
+  const cx = r.left+r.width/2, cy = r.top+r.height/2;
+  let dx=(e.clientX-cx)/(r.width/2), dy=(e.clientY-cy)/(r.height/2);
+  const mag=Math.hypot(dx,dy); if(mag>1){dx/=mag;dy/=mag;}
+  jx=dx; jy=dy;
+  nub.style.transform=`translate(${dx*48}%,${dy*48}%)`;
+}
+joy.addEventListener("pointerdown", e=>{ ptr[e.pointerId]=true; joy.setPointerCapture(e.pointerId); joyEv(e); });
+joy.addEventListener("pointermove", e=>{ if(ptr[e.pointerId]) joyEv(e); });
+const joyUp = e=>{ if(ptr[e.pointerId]){ delete ptr[e.pointerId]; jx=0;jy=0; nub.style.transform="translate(0,0)"; publishTwist(0,0); } };
+joy.addEventListener("pointerup",     joyUp);
+joy.addEventListener("pointercancel", joyUp);
+
+function dz(v){ return Math.abs(v)<CFG.deadzone?0:v; }
+function publishTwist(v,w){
+  if(!connected||!cmdVel) return;
+  cmdVel.publish(new ROSLIB.Message({linear:{x:v,y:0,z:0},angular:{x:0,y:0,z:w}}));
+}
+const anyDown = ()=>Object.keys(ptr).length>0;
+setInterval(()=>{
+  const v=dz(-jy)*CFG.vMax, w=dz(-jx)*CFG.wMax;
+  if(anyDown()||v||w) publishTwist(v,w);
+}, Math.round(1000/CFG.pubHz));
+
+/* ── STOP ───────────────────────────────────────────── */
+$("btn-stop").addEventListener("pointerdown", ()=>{
+  jx=0; jy=0; nub.style.transform="translate(0,0)";
+  for(let i=0;i<3;i++) publishTwist(0,0);
+  navigator.vibrate&&navigator.vibrate(40);
+});
+
+/* ── VOZ ─────────────────────────────────────────────── */
+let voiceWs=null, grabandoVoz=false, mediaStream=null, audioCtx=null, scriptProc=null;
+
+function conectarVoiceWs(){
+  voiceWs = new WebSocket(`ws://${HOST}:${CFG.voiceWsPort}`);
+  voiceWs.binaryType="arraybuffer";
+  voiceWs.onopen  = ()=>console.log("[voz] WS ok");
+  voiceWs.onclose = ()=>setTimeout(conectarVoiceWs,2000);
+  voiceWs.onerror = ()=>{};
+  voiceWs.onmessage = (e)=>{
+    const [estado,palabra] = e.data.split(":");
+    const btn   = $("btn-mic");
+    const label = $("mic-label");
+    btn.classList.remove("active");
+    if(estado==="aceptado"){
+      btn.classList.add("result-ok");
+      label.textContent = palabra;
+      label.style.color = "var(--live)";
+      if(connected && voicePub)
+        voicePub.publish(new ROSLIB.Message({data:palabra}));
+    } else {
+      btn.classList.add("result-err");
+      label.textContent = palabra==="audio_corto"?"corto":"?";
+      label.style.color = "var(--danger)";
+    }
+    setTimeout(()=>{
+      btn.classList.remove("result-ok","result-err");
+      label.textContent="/voice"; label.style.color="";
+    }, 2500);
+  };
+}
+
+async function toggleVoz(){
+  const btn   = $("btn-mic");
+  const label = $("mic-label");
+
+  if(grabandoVoz){
+    grabandoVoz=false;
+    btn.classList.remove("active");
+    btn.textContent="🎙";
+    label.textContent="/voice"; label.style.color="";
+    if(scriptProc){ scriptProc.disconnect(); scriptProc=null; }
+    if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+    if(audioCtx){ audioCtx.close(); audioCtx=null; }
+    return;
+  }
+
+  try{
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio:{sampleRate:16000,channelCount:1,echoCancellation:true,noiseSuppression:true},
+      video:false
+    });
+    audioCtx   = new AudioContext({sampleRate:16000});
+    const src  = audioCtx.createMediaStreamSource(mediaStream);
+    scriptProc = audioCtx.createScriptProcessor(4096,1,1);
+
+    let chunks=[], silF=0, voiF=0, rec=false;
+    const THR=0.018, SIL_LIM=7, VOI_MIN=3;
+
+    scriptProc.onaudioprocess=(e)=>{
+      if(!grabandoVoz) return;
+      const data=e.inputBuffer.getChannelData(0);
+      const rms=Math.sqrt(data.reduce((s,v)=>s+v*v,0)/data.length);
+      if(rms>THR){
+        voiF++; silF=0;
+        if(!rec && voiF>=VOI_MIN){ rec=true; chunks=[]; }
+        if(rec) chunks.push(new Float32Array(data));
+      } else {
+        if(!rec){ voiF=0; }
+        else {
+          chunks.push(new Float32Array(data));
+          silF++;
+          if(silF>=SIL_LIM){
+            const total=chunks.reduce((s,c)=>s+c.length,0);
+            const buf=new Float32Array(total);
+            let off=0; chunks.forEach(c=>{buf.set(c,off);off+=c.length;});
+            if(voiceWs&&voiceWs.readyState===WebSocket.OPEN) voiceWs.send(buf.buffer);
+            rec=false; chunks=[]; voiF=0; silF=0;
+          }
+        }
+      }
+    };
+    src.connect(scriptProc);
+    scriptProc.connect(audioCtx.destination);
+    grabandoVoz=true;
+    btn.classList.add("active");
+    btn.textContent="🔴";
+    label.textContent="escuchando";
+    label.style.color="var(--cyan)";
+  }catch(err){
+    alert("Micrófono no disponible:\n"+err.message);
+  }
+}
+
+$("btn-mic").addEventListener("click", toggleVoz);
+
+/* ── INIT ───────────────────────────────────────────── */
+connect();
+startCam();
+conectarVoiceWs();
+animateFork(0);
+</script>
+</body>
+</html>
